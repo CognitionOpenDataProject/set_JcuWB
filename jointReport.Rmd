@@ -176,234 +176,6 @@ df.object.prime_type.summary <- df.tidy %>%
     ci_low = sample_mean - error,
     ci_high = sample_mean + error
   )
-
-#########################
-# Self Focus: Child Object
-#########################
-reportedValues_self_child = reported_descriptives$self_focus$child_change
-obtainedValues_self_child = filter(df.object.prime_type.summary, object == "child", prime_type == "self")
-## Mean
-compareValues(
-  reportedValues_self_child$mean,
-  obtainedValues_self_child$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_self_child$ci_low,
-  obtainedValues_self_child$ci_low
-)
-
-compareValues(
-  reportedValues_self_child$ci_high,
-  obtainedValues_self_child$ci_high
-)
-
-#########################
-# Self Focus: Experimenter Object
-#########################
-reportedValues_self_experimenter = reported_descriptives$self_focus$experimenter_change
-obtainedValues_self_experimenter = filter(df.object.prime_type.summary, 
-                                          object == "experimenter", prime_type == "self")
-## Mean
-compareValues(
-  reportedValues_self_experimenter$mean,
-  obtainedValues_self_experimenter$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_self_experimenter$ci_low,
-  obtainedValues_self_experimenter$ci_low
-)
-
-compareValues(
-  reportedValues_self_experimenter$ci_high,
-  obtainedValues_self_experimenter$ci_high
-)
-
-#########################
-# Other Focus: Child Object
-#########################
-reportedValues_other_child = reported_descriptives$other_focus$child_change
-obtainedValues_other_child = filter(df.object.prime_type.summary, 
-                                          object == "child", prime_type == "other")
-## Mean
-compareValues(
-  reportedValues_other_child$mean,
-  obtainedValues_other_child$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_other_child$ci_low,
-  obtainedValues_other_child$ci_low
-)
-
-compareValues(
-  reportedValues_other_child$ci_high,
-  obtainedValues_other_child$ci_high
-)
-
-#########################
-# Other Focus: Experimenter Object
-#########################
-reportedValues_other_experimenter = reported_descriptives$other_focus$experimenter_change
-obtainedValues_other_experimenter = filter(df.object.prime_type.summary, 
-                                          object == "experimenter", prime_type == "other")
-## Mean
-compareValues(
-  reportedValues_other_experimenter$mean,
-  obtainedValues_other_experimenter$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_other_experimenter$ci_low,
-  obtainedValues_other_experimenter$ci_low
-)
-
-compareValues(
-  reportedValues_other_experimenter$ci_high,
-  obtainedValues_other_experimenter$ci_high
-)
-
-#########################
-# Neutral Focus: Child Object
-#########################
-reportedValues_neutral_child = reported_descriptives$neutral_focus$child_change
-obtainedValues_neutral_child = filter(df.object.prime_type.summary, 
-                                          object == "child", prime_type == "neutral")
-## Mean
-compareValues(
-  reportedValues_neutral_child$mean,
-  obtainedValues_neutral_child$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_neutral_child$ci_low,
-  obtainedValues_neutral_child$ci_low
-)
-
-compareValues(
-  reportedValues_neutral_child$ci_high,
-  obtainedValues_neutral_child$ci_high
-)
-
-#########################
-# Neutral Focus: Experimenter Object
-#########################
-reportedValues_neutral_experimenter = reported_descriptives$neutral_focus$experimenter_change
-obtainedValues_neutral_experimenter = filter(df.object.prime_type.summary, 
-                                          object == "experimenter", prime_type == "neutral")
-## Mean
-compareValues(
-  reportedValues_neutral_experimenter$mean,
-  obtainedValues_neutral_experimenter$sample_mean
-)
-
-## CIs (Note that these will be off if the mean is off)
-compareValues(
-  reportedValues_neutral_experimenter$ci_low,
-  obtainedValues_neutral_experimenter$ci_low
-)
-
-compareValues(
-  reportedValues_neutral_experimenter$ci_high,
-  obtainedValues_neutral_experimenter$ci_high
-)
-
-```
-
-
-```{r}
-df %>% filter(study == 1) %>% group_by(prime_type) %>% summarise(mean=mean(to.n(child_change), na.rm=TRUE))
-df %>% filter(study == 1) %>% group_by(prime_type) %>% summarise(mean=mean(to.n(experimenter_change), na.rm=TRUE))
-```
- 
-
-
-```{r descriptives_prime_type}
-df.prime_type.summary <- df.tidy %>%
-  spread(scoringPeriod, response) %>%
-  group_by(prime_type) %>%
-  summarize(
-    sample_mean = mean(change),
-    sample_sd = sd(change),
-    sample_n = n()
-  ) %>%
-  mutate(
-    error = qt(0.975, df = sample_n - 1) * sample_sd / sqrt(sample_n),
-    ci_low = sample_mean - error,
-    ci_high = sample_mean + error
-  )
-
-#########################
-# Self Focus (collapse across objects)
-#########################
-reportedValues_selfPrime = reported_descriptives$picture_types$self
-obtainedValues_selfPrime = filter(df.prime_type.summary, prime_type == "self")
-## Mean
-compareValues(
-  reportedValues_selfPrime$mean,
-  obtainedValues_selfPrime$sample_mean
-)
-
-## CIs (Note that these be off if the mean is off)
-compareValues(
-  reportedValues_selfPrime$ci_low,
-  obtainedValues_selfPrime$ci_low
-)
-
-compareValues(
-  reportedValues_selfPrime$ci_high,
-  obtainedValues_selfPrime$ci_high
-)
-
-#########################
-# Other Focus (collapse across objects)
-#########################
-reportedValues_otherPrime = reported_descriptives$picture_types$other
-obtainedValues_otherPrime = filter(df.prime_type.summary, prime_type == "other")
-## Mean
-compareValues(
-  reportedValues_otherPrime$mean,
-  obtainedValues_otherPrime$sample_mean
-)
-
-## CIs (Note that these be off if the mean is off)
-compareValues(
-  reportedValues_otherPrime$ci_low,
-  obtainedValues_otherPrime$ci_low
-)
-
-compareValues(
-  reportedValues_otherPrime$ci_high,
-  obtainedValues_otherPrime$ci_high
-)
-
-#########################
-# Neutral Focus (collapse across objects)
-#########################
-reportedValues_neutralPrime = reported_descriptives$picture_types$neutral
-obtainedValues_neutralPrime = filter(df.prime_type.summary, prime_type == "neutral")
-## Mean
-compareValues(
-  reportedValues_neutralPrime$mean,
-  obtainedValues_neutralPrime$sample_mean
-)
-
-## CIs (Note that these be off if the mean is off)
-compareValues(
-  reportedValues_neutralPrime$ci_low,
-  obtainedValues_neutralPrime$ci_low
-)
-
-compareValues(
-  reportedValues_neutralPrime$ci_high,
-  obtainedValues_neutralPrime$ci_high
-)
 ```
 
 
@@ -424,22 +196,34 @@ df.object.prime_type.summary %>%
   xlab("Picture Focus")
 ```
 
+Note that this seems to match up pretty well with the results in df.object.prime_type.summary, although the values from which this graph is plotted are never directly reported in the paper, so it's impossible to run CompareValues.
 
+```{r descriptives_prime_type}
+df.prime_type.summary <- df.tidy %>%
+  spread(scoringPeriod, response) %>%
+  group_by(prime_type) %>%
+  summarize(
+    sample_mean = mean(change),
+    sample_sd = sd(change),
+    sample_n = n()
+  ) %>%
+  mutate(
+    error = qt(0.975, df = sample_n - 1) * sample_sd / sqrt(sample_n),
+    ci_low = sample_mean - error,
+    ci_high = sample_mean + error
+  )
 
+```
 
 
 ### Inferential statistics
 
-
-
 Main results (Section 2.3):
 
-> We found a significant interaction between picture construction condition and toy owner (F(2, 53) = 4.83, p = 0.01, View the MathML source).
 > We found a significant interaction between picture construction condition and toy owner (F(2, 53) = 4.83, p = 0.01, View the MathML source). Specifically, following self-focus, children increased the value of their own toy (M = 0.95, 95% CI = [0.38, 1.52]) but not the experimenter’s toy (M = −0.07, 95% CI = [−0.74, 0.59], t(19) = 3.56, p = 0.01, d = 0.81, Bonferroni corrected). The opposite pattern of responses were observed in the other-focus condition, in which children valued the experimenter’s toy higher (M = 0.86, 95% CI = [0.20, 1.51]), but not their own toy (M = 0.17, 95% CI = [−0.39, 0.73]) - although this effect was not statistically significant (t(19) = −1.61, p = 0.36, d = 0.48, Bonferroni corrected). There was no significant effect of toy owner in the neutral-focus condition (Mchild = 0.89, 95% CIchild = [0.31, 1.46], Mexperimenter = 0.71, 95% CIexperimenter = [0.04, 1.38], t(19) = 0.48, p = 0.64, d = 0.13). The mean value change scores for each condition as a function of toy owner are presented in Fig. 2. We found no significant main effects of types of picture type (Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28], F(2, 53) = 0.61, p = 0.55, View the MathML source) or toy owner (Mchild = 0.67, 95% CIchild = [0.34, 0.99], Mexperimenter = 0.50, 95% CIexperimenter = [0.12, 0.89], F(1, 53) = 0.55, p = 0.46, View the MathML source). A significant effect of age was observed (F(1, 53) = 7.68, p = 0.01, View the MathML source), indicating that older children increased their valuations more than younger children regardless of toy owner or picture condition. No significant effect of gender (F(1, 53) = 0.46, p = 0.50, View the MathML source), and no significant interactions involving gender or age were observed (Fs < 2.69, ps > 0.11, etc.).
 
 
 ```{r fstatistics}
-
 reported_inferentials <- list(
   anova = list(
     interaction = list(dfn = 2, dfd = 53, f = 4.83, p = 0.01),
@@ -453,10 +237,21 @@ reported_inferentials <- list(
   )
 )
 
-
 # > To examine the effects of priming on value-change for the two identical endowment toys, a mixed ANCOVA was conducted. Toy owner (child or experimenter) was entered as a repeated measures factor and picture type (self-focus, other- focus, neutral-focus) and gender were entered as a between sub- jects factors. Additionally, child age was normalized and entered as a covariate into the model.
 
-anova.rs <- ezANOVA(
+anova.rs_neutral_included <- ezANOVA(
+  df.tidy %>%
+    filter(scoringPeriod == "change") %>%
+    mutate(gender = factor(gender)),
+  dv = response,
+  wid = participant_id,
+  within = .(object),
+  between = .(prime_type, gender),
+  between_covariates = age_normalized,
+  detailed = T, return_aov = T
+)
+
+anova.rs_neutral_excluded <- ezANOVA(
   df.tidy %>%
     filter(scoringPeriod == "change", object != "neutral") %>%
     mutate(gender = factor(gender)),
@@ -469,37 +264,73 @@ anova.rs <- ezANOVA(
 )
 
 reportedValues_ownerPrimeInteraction = reported_inferentials$anova$interaction
-obtainedValues_neutralPrimeInteraction = filter(anova.rs$ANOVA, Effect == "prime_type:object")
+obtainedValues_neutral_excluded_PrimeInteraction = filter(anova.rs_neutral_excluded$ANOVA, Effect == "prime_type:object")
+obtainedValues_neutral_included_PrimeInteraction = filter(anova.rs_neutral_included$ANOVA, Effect == "prime_type:object")
 
 ## df numerator
+#neutral included
 compareValues(
   reportedValues_ownerPrimeInteraction$dfn,
-  obtainedValues_neutralPrimeInteraction$DFn
+  obtainedValues_neutral_included_PrimeInteraction$DFn
+)
+
+#neutral excluded
+compareValues(
+  reportedValues_ownerPrimeInteraction$dfn,
+  obtainedValues_neutral_excluded_PrimeInteraction$DFn
 )
 
 ## df denominator
+#neutral included
 compareValues(
   reportedValues_ownerPrimeInteraction$dfd,
-  obtainedValues_neutralPrimeInteraction$DFd
+  obtainedValues_neutral_included_PrimeInteraction$DFd
+)
+
+#neutral excluded
+compareValues(
+  reportedValues_ownerPrimeInteraction$dfd,
+  obtainedValues_neutral_excluded_PrimeInteraction$DFd
 )
 
 
 ## F stat
+#neutral included
 compareValues(
   reportedValues_ownerPrimeInteraction$f,
-  obtainedValues_neutralPrimeInteraction$F
+  obtainedValues_neutral_included_PrimeInteraction$F
+)
+
+#neutral excluded
+compareValues(
+  reportedValues_ownerPrimeInteraction$f,
+  obtainedValues_neutral_excluded_PrimeInteraction$F
 )
 
 ## p-value
+#neutral included
 compareValues(
   reportedValues_ownerPrimeInteraction$p,
-  obtainedValues_neutralPrimeInteraction$p, 
+  obtainedValues_neutral_included_PrimeInteraction$p, 
   isP = T
 )
+
+#neutral excluded
+compareValues(
+  reportedValues_ownerPrimeInteraction$p,
+  obtainedValues_neutral_excluded_PrimeInteraction$p, 
+  isP = T
+)
+
 ``` 
 
-Main ANOVA results replicate, though numbers are off a bit.
+It's unclear how they specified their ANCOVA model. They say they included all three levels of the prime_type (i.e. their "picture type") variable. If you run a model with all of these, however, the results are way off. For main effects, our DFd is off by 1 from theirs. For the main effect of gender, they report F(1,53), and we have F(1,54). However, for the interaction terms (e.g. the central analysis of interest, the interaction of prime_type and object), the problem is much worse: we have F(2, 108) and they report F(1, 53). Correspondingly, this leads to several numerical errors and, especially a decision error on the interaction, which is the central result of Exp 2 (they report p=0.01, we get p=0.13).
 
+However, the simple effects they report seem to focus on the "self" and "other" level, but not the "neutral" level. This suggests that their ANCOVA may have excluded the "neutral" level. If you run an ANCOVA with this level excluded, you get DFd much more similar to theirs: (2,54) compared to their (2,53). You also get p-values much more similar to what they report, all over the place. E.g. the F-value of the interaction they report is 4.83, and the one derived here is 4.87. There are no longer any decision errors.
+
+My conclusion is that this is very likely what they did, although it is not (as far as I can tell) what they report. I still can't understand where the difference of 1 in DFd comes from, though.
+
+Note that they likely ran their ANCOVA in SPSS (which, unlike R, gives significance and F and p-values for the covariate of age, which they report in their paper), but specifying type=3 (which is supposed to mimic SPSS, vs default 2 in ezANOVA) doesn't affect the data.
 
 ```{r tstatistics}
 
@@ -578,7 +409,7 @@ compareValues(
 
 ```
 
-No decision errors! It seems like the authors report all their p-values as p = 0.01 (when in fact they are < 0.01)
+No decision errors! It seems like the authors report all their p-values as p = 0.01 (when in fact they are < 0.01). They say they use a Bonferroni correction (but don't say how many multiple comparisons they're correcting for), so the p-values they report are probably corrected. Note that they do not report applying a correction to the t-test in the neutralFocus cases (presumably because it's not significant anyway), so that leads the p-values to be a match in that case (further confirming that where they don't match, it's because of a correction being applied)
 
 ## Step 5: Conclusion
 
