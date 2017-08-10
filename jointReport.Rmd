@@ -124,8 +124,6 @@ df.tidy <- df.tidy %>%
 ## Step 4: Run analysis
 
 ### Descriptive statistics
-
-
 ```{r reported_descriptives}
 reported_descriptives <- list(
   self_focus = list(
@@ -161,6 +159,7 @@ reported_descriptives <- list(
 )
 ```
 
+It's unclear from the paper, but While these look like they could be descriptive cell means in the paper may actually be model-derived marginal means. The cell means are not reported, but are shown in Figure 2, where they do seem to match up directly with the descriptive means we get here.
 
 
 ```{r descriptives_prime_typeXobject}
@@ -317,14 +316,12 @@ compareValues(
 
 ```
 
-Overall, my calculations seem to just be slightly off of theirs, but consistently off. Perhaps a subject was excluded that I'm not aware of? (I re-read the relevant text a couple of times, so I'm not sure that's the case). 
 
-All of the cell means seem to be off (which throws off the CIs). As a sanity check, run a mean calculation on the un-tidyverse-ed data
 ```{r}
-df %>% group_by(prime_type) %>% summarise(mean=mean(to.n(child_change), na.rm=TRUE))
-df %>% group_by(prime_type) %>% summarise(mean=mean(to.n(experimenter_change), na.rm=TRUE))
-
+df %>% filter(study == 1) %>% group_by(prime_type) %>% summarise(mean=mean(to.n(child_change), na.rm=TRUE))
+df %>% filter(study == 1) %>% group_by(prime_type) %>% summarise(mean=mean(to.n(experimenter_change), na.rm=TRUE))
 ```
+ 
 
 
 ```{r descriptives_prime_type}
