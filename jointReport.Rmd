@@ -409,7 +409,9 @@ compareValues(
 
 ```
 
-No decision errors! It seems like the authors report all their p-values as p = 0.01 (when in fact they are < 0.01). They say they use a Bonferroni correction (but don't say how many multiple comparisons they're correcting for), so the p-values they report are probably corrected. Note that they do not report applying a correction to the t-test in the neutralFocus cases (presumably because it's not significant anyway), so that leads the p-values to be a match in that case (further confirming that where they don't match, it's because of a correction being applied)
+No errors on the t-tests at all, except on the p-values. It seems like the authors report all their p-values as p = 0.01 (when in fact they are < 0.01). They say they use a Bonferroni correction (but don't say how many multiple comparisons they're correcting for), so the p-values they report are probably corrected. Note that they do not report applying a correction to the t-test in the neutralFocus cases (presumably because it's not significant anyway), so that leads the p-values to be a match in that case (further confirming that where they don't match, it's because of a correction being applied)
+
+Note also that the way t-tests are described in the paper sounds more like one-sample comparisons of change in each condition to zero, rather than between conditions. They write, "children increased the value of their own toy... but not the experimenter’s toy". However, the t-statistics reported appear to be derived from comparison between conditions (i.e. the significant difference between children's increase in value of their own toy, relative to the experimenter's toy)
 
 ## Step 5: Conclusion
 
@@ -423,11 +425,12 @@ codReport(Report_Type = 'pilot',
 ```
 
 
-Overall, I think this was a successful replication. The data set has informative labels (though not the best structure for re-analysis, e.g., the "endowment_baseline" applies to both the experimenter_object and the child_object -- which is reported in the paper to be the same -- but to analyze the data, you need to duplicate that column). The vast majority of my exact numerical calculations are off from the authors by varying degrees. This may be because there is a subject that should be excluded, or a small error in my pipeline. 
 
-I also am a little unclear on their reporting of their main ANCOVA. From their text, it seems like normalized age is a covariate (not a factor), but then they report an effect of age. I'm not a ANOVA expert, but when I run the `ezAnova` as I think makes sense, there is no estimate for age effect. So I'm not sure if I'm going wrong somewhere with that. 
+Note first of all, that the numbers of errors reported above are using the most generous interpretations of what the authors did (see above). If, for example, the main interaction between object and prime_type included all levels of both variables, there would be a decision error and even more major numerical errors.
 
-23 major numerical errors, but somehow, no decision errors.
+Overall, I think this was a successful replication with several caveats. The data set has informative labels (though not the best structure for re-analysis, e.g., the "endowment_baseline" applies to both the experimenter_object and the child_object -- which is reported in the paper to be the same -- but to analyze the data, you need to duplicate that column).
+
+However, the vast majority of our exact numerical calculations are off from the authors by varying degrees. These differences appear to be due to significant gaps and confusing/misleading statements in what the authors report relative to what they did. Specifically, what is described as a series of one-sample t-tests in the text are actually paired two-sample tests. It also appears (though it's harder to be sure here) that one of three levels of a variable is excluded in the main ANCOVA -- this causes the interaction between the two variables (one of the main results of paper) to be significant, as reported in the paper. With this level included, the interaction is not significant, leading to a decision error which would dramatically alter the theoretical conclusions of the paper. It may be possible to justify excluding this level from the analysis on theoretical grounds, but the authors do not report this exclusion in the text and do not provide such a justification.
 
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}
 devtools::session_info()
