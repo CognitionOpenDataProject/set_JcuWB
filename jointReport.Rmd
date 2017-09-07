@@ -54,6 +54,8 @@ library(ez)
 to.n <- function(fctr){
   return(as.numeric(as.character(fctr)))
 }
+
+se <- function(x) sqrt(var(x)/length(x))
 ```
 
 ## Step 2: Load data
@@ -159,7 +161,7 @@ reported_descriptives <- list(
 )
 ```
 
-It's unclear from the paper, but While these look like they could be descriptive cell means in the paper may actually be model-derived marginal means. The cell means are not reported, but are shown in Figure 2, where they do seem to match up directly with the descriptive means we get here.
+It's unclear from the paper, but while these look like they could be descriptive cell means in the paper may actually be model-derived marginal means. The cell means are not reported, but are shown in Figure 2, where they do seem to match up directly with the descriptive means we get here.
 
 
 ```{r descriptives_prime_typeXobject}
@@ -169,19 +171,26 @@ df.object.prime_type.summary <- df.tidy %>%
   summarize(
     sample_mean = mean(change),
     sample_sd = sd(change),
+    sample_se = se(change),
     sample_n = n()
   ) %>%
   mutate(
     error = qt(0.975, df = sample_n - 1) * sample_sd / sqrt(sample_n),
     ci_low = sample_mean - error,
-    ci_high = sample_mean + error
+    ci_high = sample_mean + error,
+    se_low = sample_mean - sample_se,
+    se_high = sample_mean + sample_se
   )
 ```
 
 
 ### Figure 2 in paper
 
-Error bars here denote 95% CIs
+![](fig2.png)
+
+
+
+Error bars here denote SEMs.
 
 ```{r figure2}
 df.object.prime_type.summary %>%
@@ -189,7 +198,7 @@ df.object.prime_type.summary %>%
   mutate(prime_type = factor(prime_type, levels = c("self", "other", "neutral"),
                              labels = c("self", "other", "farm"))) %>%
   ggplot(., aes( x = prime_type, fill = object, group = object,
-                 y = sample_mean, ymin = ci_low, ymax = ci_high))+
+                 y = sample_mean, ymin = se_low, ymax = se_high))+
   geom_col(position = position_dodge(0.7), width = 0.7, color = 'black')+
   geom_errorbar(position = position_dodge(0.7), width = 0.5)+
   ylab("Mean Value Change Score")+
