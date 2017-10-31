@@ -8,7 +8,6 @@ output:
 
 #### Article ID: JcuWB
 #### Pilot: Michael Henry Tessler
-#### Co-pilot: Tom Hardwicke  
 #### Start date: 04/17/2017
 #### End date: [Insert end date - use US format]   
 
