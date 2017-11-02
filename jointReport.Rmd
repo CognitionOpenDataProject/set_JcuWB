@@ -10,7 +10,7 @@ output:
 #### Pilot: Michael Henry Tessler
 #### Co-pilot: Roman Feiman
 #### Start date: 04/17/2017
-#### End date: [Insert end date - use US format]   
+#### End date: 11/01/2017   
 
 -------
 
@@ -66,6 +66,11 @@ m_ci <- function(vector){ # a function to calculate cis of the mean
 
 ```{r}
 df <- read.csv("data/data.csv")
+
+# NB - THERE APPEARS TO BE AN ISSUE WITH THE AGE RECORDED FOR PARTICIPANT 103 - IT IS 56 MONTHS IN OUR DATASET AND 57 MONTHS IN THE AUTHORS SPSS DATA SET. LETS CHANGE THE VALUE TO MATCH THEIR SPSS DATA SET:
+df[22,'age'] = '4y9m'
+
+df <- df %>% filter(study == 1) # select study 1 only
 ```
 
 This data frame has 18 variables: 
@@ -79,16 +84,24 @@ This data frame has 18 variables:
 ## Step 3: Tidy data
 
 ```{r}
-df.tidy <- df %>% filter(study == 1) %>%
+# create normalised age column first
+df <- df %>% separate(age, into = c("year", "month"), sep = "y") %>%
+  mutate(month = as.numeric(gsub("m", "", month)),
+         year = as.numeric(year),
+         age_in_months = year*12 + month)
+  
+mean_age <- mean(df$age_in_months)
+sd_age <- sd(df$age_in_months)
+df <- df %>%
+  mutate(age_normalized = as.numeric(scale(age_in_months)))
+
+
+df.tidy <- df %>% 
   separate(prime_time, into =c('min', 'sec'), sep = "min") %>%
   select(-unowned_post, -unowned_change) %>% # not used in expt 1
-  separate(age, into = c("year", "month"), sep = "y") %>%
   mutate(sec = gsub("sec", "", sec),
          sec = as.numeric(sec),
          min = as.numeric(min),
-         month = as.numeric(gsub("m", "", month)),
-         year = as.numeric(year),
-         age_in_months = year*12 + month,
          prime_time_seconds = min*60 + sec,
          neutral_baseline = to.n(neutral_baseline),
          experimenter_post = to.n(experimenter_post),
@@ -115,18 +128,6 @@ df.tidy %>%
 ```
 
 The "change" scores reported in the raw data are the same as "post" - "baseline". Good.
-
-## Step 3: Preprocessing
-
-For ANCOVA, age is normalized
-
-```{r}
-mean_age = mean(df.tidy$age_in_months)
-sd_age = sd(df.tidy$age_in_months)
-df.tidy <- df.tidy %>% 
-  mutate(age_normalized = (age_in_months - mean_age) / sd_age)
-```
-
 
 ## Step 4: Run analysis
 
@@ -191,14 +192,12 @@ df.prime_type.summary <- df.tidy %>%
     ci_low = sample_mean - error,
     ci_high = sample_mean + error
   )
-
 ```
 
 
 ### Inferential statistics
 
 > To examine the effects of priming on value-change for the two identical endowment toys, a mixed ANCOVA was conducted. Toy owner (child or experimenter) was entered as a repeated measures factor and picture type (self-focus, other-focus, neutral-focus) and gender were entered as between subjects factors. Additionally, child age was normalized and entered as a covariate into the model.
-
 
 ```{r}
 # prepare data for ANCOVA
@@ -210,116 +209,79 @@ forAOV <- df.tidy %>%
            object = factor(object),
            prime_type = factor(prime_type))
 
+spss <- read_csv('data/spss.csv') %>% mutate(participant_id = factor(ppid)) %>% gather(object, response, child_change:experimenter_change, factor_key=TRUE) %>% arrange(participant_id) %>% rename(age_normalized = Zage) %>% mutate(gender = factor(gender), object = factor(object), prime_type = factor(prime_type))
+forAOV <- forAOV %>% arrange(participant_id)
+
 # run ANCOVA
 aov_out <- aov_ez(id = "participant_id", dv = "response", data = forAOV, between = c("prime_type", "gender"),
-within = c("object"), covariate = "age_normalized",
-observed = c("age_normalized"), factorize = F, anova_table = list(correction = "none", es = "pes"))
+within = c("object"), covariate = "age_normalized", observed = c("age_normalized"), factorize = F, anova_table = list(correction = "none", es = "pes"), type = 'III')
 
 kable(aov_out$anova_table)
 ```
 
-
 > We found a significant interaction between picture construction condition and toy owner (F(2, 53) = 4.83, p = 0.01, partial eta-squared = 0.15).
-
+		
 ```{r}
 # from anova table - prime_type:object -
 compareValues(reportedValue = 2, obtainedValue = 2) # df1
 compareValues(reportedValue = 53, obtainedValue = 53) # df2
-compareValues(reportedValue = 4.83, obtainedValue = 4.8287312) # F
-compareValues(reportedValue = .01, obtainedValue = 0.0118449, isP = T) # p
-compareValues(reportedValue = .15, obtainedValue = 0.1541311) # partial eta-squared
+compareValues(reportedValue = 4.83, obtainedValue = 4.8305016) # F 	
+compareValues(reportedValue = .01, obtainedValue = 0.0118272, isP = T) # p
+compareValues(reportedValue = .15, obtainedValue = 0.1541789) # partial eta-squared
 ```
 All matches.
+
+We initially had problems reproducing the means and confidence intervals. However, this was because we were calculating the sample means - the original authors informed us these values are in fact the estimated marginal means.
 
 > We found no significant main effects of types of picture type (Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28], F(2, 53) = 0.61, p = 0.55, partial eta-squared = .02) 
 
 ```{r}
-self <- forAOV %>% filter(prime_type == 'self') %>% pull(response)
-other <- forAOV %>% filter(prime_type == 'other') %>% pull(response)
-neutral <- forAOV %>% filter(prime_type == 'neutral') %>% pull(response)
-
-self_m <- mean(self)
-neutral_m <- mean(neutral)
-other_m <- mean(other)
-
-self_ci <- m_ci(self)
-neutral_ci <- m_ci(neutral)
-other_ci <- m_ci(other)
-
-# descriptives 
-compareValues(reportedValue = 0.44, obtainedValue = self_m) # self mean
-compareValues(reportedValue = -0.04, obtainedValue = self_ci[1]) # self lower ci
-compareValues(reportedValue = 0.91, obtainedValue = self_ci[2]) # self upper ci
-
-compareValues(reportedValue = 0.51, obtainedValue = other_m) # other mean
-compareValues(reportedValue = 0.04, obtainedValue = other_ci[1]) # other lower ci
-compareValues(reportedValue = 0.98, obtainedValue = other_ci[2]) # other upper ci
-
-compareValues(reportedValue = 0.80, obtainedValue = neutral_m) # neutral mean
-compareValues(reportedValue = 0.32, obtainedValue = neutral_ci[1]) # neutral lower ci
-compareValues(reportedValue = 1.28, obtainedValue = neutral_ci[2]) # neutral upper ci
+# descriptives
+lsmeans(aov_out, c("prime_type"))
 
 # from anova table - prime_type -
 compareValues(reportedValue = 2, obtainedValue = 2) # df1
 compareValues(reportedValue = 53, obtainedValue = 53) # df2
-compareValues(reportedValue = .61, obtainedValue = .5922056) # F
-compareValues(reportedValue = .55, obtainedValue = .5567241, isP = T) # p
-compareValues(reportedValue = .02, obtainedValue = 0.0218589) # partial eta-squared
+compareValues(reportedValue = .61, obtainedValue = 0.6102613) # F
+compareValues(reportedValue = .55, obtainedValue = 0.5469813, isP = T) # p
+compareValues(reportedValue = .02, obtainedValue = 0.0225103) # partial eta-squared
 ```
 
-For ANCOVA -  All matches or minor numerical errors.
-
-But cannot reproduce most of the descriptive statistics.
+For ANCOVA output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
 
 > or toy owner (Mchild = 0.67, 95% CIchild = [0.34, 0.99], Mexperimenter = 0.50, 95% CIexperimenter = [0.12, 0.89], F(1, 53) = 0.55, p = 0.46, partial eta-squared = .01). 
 
 ```{r}
-child <- forAOV %>% filter(object == 'child') %>% pull(response)
-exp <- forAOV %>% filter(object == 'experimenter') %>% pull(response)
-
-child_m <- mean(child)
-exp_m <- mean(exp)
-
-child_ci <- m_ci(child)
-exp_ci <- m_ci(exp)
-
-
-# descriptives 
-compareValues(reportedValue = 0.67, obtainedValue = child_m) #  child mean
-compareValues(reportedValue = 0.34, obtainedValue = child_ci[1]) # child lower ci
-compareValues(reportedValue = 0.99, obtainedValue = child_ci[2]) # child upper ci
-
-compareValues(reportedValue = 0.50, obtainedValue = exp_m) # exp mean
-compareValues(reportedValue = 0.12, obtainedValue = exp_ci[1]) # exp lower ci
-compareValues(reportedValue = 0.89, obtainedValue = exp_ci[2]) # exp upper ci
-
+lsmeans(aov_out, c("object"))
 
 # from anova table - object	
 compareValues(reportedValue = 1, obtainedValue = 1) # df1
 compareValues(reportedValue = 53, obtainedValue = 53) # df2
-compareValues(reportedValue = .55, obtainedValue = .5515933) # F
-compareValues(reportedValue = .46, obtainedValue = .4309466, isP = T) # p
-compareValues(reportedValue = .01, obtainedValue = 0.0103002) # partial eta-squared
+compareValues(reportedValue = .55, obtainedValue = 0.5516502) # F
+compareValues(reportedValue = .46, obtainedValue = 0.4609237, isP = T) # p
+compareValues(reportedValue = .01, obtainedValue = 0.0103013) # partial eta-squared
 ```
-In this case the there are only matches and minor numerical errors.
+For ANCOVA output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
 
 > A significant effect of age was observed (F(1, 53) = 7.68, p = 0.01, partial eta-squared = .13), indicating that older children increased their valuations more than younger children regardless of toy owner or picture condition. 
 
 ```{r}
 compareValues(reportedValue = 1, obtainedValue = 1) # df
 compareValues(reportedValue = 53, obtainedValue = 53) # df2
-compareValues(reportedValue = 7.68, obtainedValue = 7.3720834) # F
-compareValues(reportedValue = 0.01, obtainedValue = 0.0089221, isP = T) # p
-compareValues(reportedValue = 0.13, obtainedValue = 0.1221108) # partial eta squared
+compareValues(reportedValue = 7.68, obtainedValue = 7.6785634) # F
+compareValues(reportedValue = 0.01, obtainedValue = 0.0076901, isP = T) # p
+compareValues(reportedValue = 0.13, obtainedValue = 0.1265449) # partial eta squared
 ```
+All matches.
+
 > No significant effect of gender (F(1, 53) = 0.46, p = 0.50, partial eta-squared = .01),
 
 ```{r}
 compareValues(reportedValue = 1, obtainedValue = 1) # df
 compareValues(reportedValue = 53, obtainedValue = 53) # df2
-compareValues(reportedValue = 0.46, obtainedValue = 0.4439143) # F
-compareValues(reportedValue = 0.50, obtainedValue = 0.5081291, isP = T) # p
-compareValues(reportedValue = 0.01, obtainedValue = 0.0083062) # partial eta squared
+compareValues(reportedValue = 0.46, obtainedValue = 0.4580328) # F
+compareValues(reportedValue = 0.50, obtainedValue = 0.5469813, isP = T) # p
+compareValues(reportedValue = 0.01, obtainedValue = 0.0085681) # partial eta squared
 ```
 
 >  and no significant interactions involving gender or age were observed (Fs < 2.69, ps > 0.11, etc.).
@@ -335,50 +297,34 @@ Its necessary to eyeball these as the exact values are not reported. The values 
 ```{r}
 child <- forAOV %>% filter(prime_type == 'self', object == 'child') %>% pull(response)
 experimenter <- forAOV %>% filter(prime_type == 'self', object == 'experimenter') %>% pull(response)
-child_m <- mean(child)
-exp_m <- mean(experimenter)
-child_ci <- m_ci(child)
-exp_ci <- m_ci(experimenter)
+
+# descriptives
+lsmeans(aov_out, c("prime_type"), by = 'object')
+
 t_out <- t.test(child, experimenter, paired = T)
 p <- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
 d <- cohensD(child, experimenter, method = 'pooled')
-
-compareValues(reportedValue = 0.95, obtainedValue = child_m) # mean
-compareValues(reportedValue = 0.38, obtainedValue = child_ci[1]) # lower ci
-compareValues(reportedValue = 1.52, obtainedValue = child_ci[2]) # upper ci
-
-compareValues(reportedValue = -0.07, obtainedValue = exp_m) # mean
-compareValues(reportedValue = -0.74, obtainedValue = exp_ci[1]) # lower ci
-compareValues(reportedValue = 0.59, obtainedValue = exp_ci[2]) # upper ci
 
 compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df
 compareValues(reportedValue = 3.56, obtainedValue = t_out$statistic) # t
 compareValues(reportedValue = .81, obtainedValue = d) # d
 compareValues(reportedValue = .01, obtainedValue = p, isP = T) # p 
-
 ```
-Strangely it seems that we can reproduce the t-test output but not the means and cis.
+
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
 
 > The opposite pattern of responses were observed in the other-focus condition, in which children valued the experimenter’s toy higher (M = 0.86, 95% CI = [0.20, 1.51]), but not their own toy (M = 0.17, 95% CI = [−0.39, 0.73]) - although this effect was not statistically significant (t(19) = −1.61, p = 0.36, d = 0.48, Bonferroni corrected).
 
 ```{r}
 child <- forAOV %>% filter(prime_type == 'other', object == 'child') %>% pull(response)
 experimenter <- forAOV %>% filter(prime_type == 'other', object == 'experimenter') %>% pull(response)
-child_m <- mean(child)
-exp_m <- mean(experimenter)
-child_ci <- m_ci(child)
-exp_ci <- m_ci(experimenter)
+
+# descriptives
+lsmeans(aov_out, c("prime_type"), by = 'object')
+
 t_out <- t.test(child, experimenter, paired = T)
 p <- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
 d <- cohensD(child, experimenter, method = 'pooled')
-
-compareValues(reportedValue = 0.17, obtainedValue = child_m) # mean
-compareValues(reportedValue = -0.39, obtainedValue = child_ci[1]) # lower ci
-compareValues(reportedValue = 0.73, obtainedValue = child_ci[2]) # upper ci
-
-compareValues(reportedValue = 0.86, obtainedValue = exp_m) # mean
-compareValues(reportedValue = 0.20, obtainedValue = exp_ci[1]) # lower ci
-compareValues(reportedValue = 1.51, obtainedValue = exp_ci[2]) # upper ci
 
 compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df
 compareValues(reportedValue = -1.61, obtainedValue = t_out$statistic) # t
@@ -387,27 +333,19 @@ compareValues(reportedValue = .48, obtainedValue = d) # d
 compareValues(reportedValue = .36, obtainedValue = p, isP = T) # p 
 ```
 
-Again it seems that we can reproduce the t-test output but not all of the means and cis.
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
 
 > There was no significant effect of toy owner in the neutral-focus condition (Mchild = 0.89, 95% CIchild = [0.31, 1.46], Mexperimenter = 0.71, 95% CIexperimenter = [0.04, 1.38], t(19) = 0.48, p = 0.64, d = 0.13).
 
 ```{r}
 child <- forAOV %>% filter(prime_type == 'neutral', object == 'child') %>% pull(response)
 experimenter <- forAOV %>% filter(prime_type == 'neutral', object == 'experimenter') %>% pull(response)
-child_m <- mean(child)
-exp_m <- mean(experimenter)
-child_ci <- m_ci(child)
-exp_ci <- m_ci(experimenter)
+
+# descriptives
+lsmeans(aov_out, c("prime_type"), by = 'object')
+
 t_out <- t.test(child, experimenter, paired = T)
 d <- cohensD(child, experimenter, method = 'pooled')
-
-compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean
-compareValues(reportedValue = 0.31, obtainedValue = child_ci[1]) # lower ci
-compareValues(reportedValue = 1.46, obtainedValue = child_ci[2]) # upper ci
-
-compareValues(reportedValue = 0.71, obtainedValue = exp_m) # mean
-compareValues(reportedValue = 0.04, obtainedValue = exp_ci[1]) # lower ci
-compareValues(reportedValue = 1.38, obtainedValue = exp_ci[2]) # upper ci
 
 compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df
 compareValues(reportedValue = 0.48, obtainedValue = t_out$statistic) # t
@@ -415,7 +353,7 @@ compareValues(reportedValue = .13, obtainedValue = d) # d
 
 compareValues(reportedValue = .64, obtainedValue = t_out$p.value, isP = T) # p 
 ```
-
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
 
 ## Step 5: Conclusion
 
@@ -424,10 +362,14 @@ codReport(Report_Type = 'joint',
           Article_ID = 'JcuWB', 
           Insufficient_Information_Errors = 0,
           Decision_Errors = 0, 
-          Major_Numerical_Errors = 18, 
-          Minor_Numerical_Errors = 6,
-          Author_Assistance = F)
+          Major_Numerical_Errors = 0, 
+          Minor_Numerical_Errors = 2,
+          Author_Assistance = T)
 ```
+
+We initially ran into difficulties with this reproducibility check. Specifically, we were able to reproduce the output of the ANCOVA and t-tests failrly closely, but many of the means and CIs were not matching up. The original authors informed us that these values were in fact marginal means rather than sample means. We attempted to calculate the marginal means with the R function lsmeans, and came much closer, but still could not reporduce some values. However, the authors have provided SPSS syntax which can be used to reproduce the values reported in the article.
+
+Provision of the SPSS syntax and corresponding data file also enabled us to solve a secondary issue. We noticed that our normalized age values did not match up exactly with those in the SPSS file. Eventually, we identified the source of the problem - in the original data file, the age for participant 103 is given as “4y8m" i.e, 56 months. However, in the SPSS data file the age for this participant is given as 57 months. When we changed the age to 57, the normalised values matched up. 
 
 ```{r session_info, include=TRUE, echo=TRUE, results='markup'}
 devtools::session_info()

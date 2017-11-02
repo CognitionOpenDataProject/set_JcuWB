@@ -230,8 +230,8 @@ div.tocify {
 <div id="start-date-04172017" class="section level4">
 <h4>Start date: 04/17/2017</h4>
 </div>
-<div id="end-date-insert-end-date---use-us-format" class="section level4">
-<h4>End date: [Insert end date - use US format]</h4>
+<div id="end-date-11012017" class="section level4">
+<h4>End date: 11/01/2017</h4>
 <hr />
 </div>
 <div id="methods-summary" class="section level4">
@@ -275,21 +275,34 @@ m_ci &lt;- function(vector){ # a function to calculate cis of the mean
 </div>
 <div id="step-2-load-data" class="section level2">
 <h2>Step 2: Load data</h2>
-<pre class="r"><code>df &lt;- read.csv(&quot;data/data.csv&quot;)</code></pre>
+<pre class="r"><code>df &lt;- read.csv(&quot;data/data.csv&quot;)
+
+# NB - THERE APPEARS TO BE AN ISSUE WITH THE AGE RECORDED FOR PARTICIPANT 103 - IT IS 56 MONTHS IN OUR DATASET AND 57 MONTHS IN THE AUTHORS SPSS DATA SET. LETS CHANGE THE VALUE TO MATCH THEIR SPSS DATA SET:
+df[22,'age'] = '4y9m'
+
+df &lt;- df %&gt;% filter(study == 1) # select study 1 only</code></pre>
 <p>This data frame has 18 variables: - participant ID, gender, age, experiment #, prime_type (manipulation), - baseline scores for the endowment object(s) (reported in text to be the same for the identical objects for all children), neutral objects, - post scores for the endowment object given to the child, experimenter, and for the neutral object - prime_time is the amount of time spent on the priming / distractor task - pronouns is number of pronouns of either second person (You, for self-priming) and third person (They, for other priming) in their respective conditions - change scores (post - baseline)</p>
 </div>
 <div id="step-3-tidy-data" class="section level2">
 <h2>Step 3: Tidy data</h2>
-<pre class="r"><code>df.tidy &lt;- df %&gt;% filter(study == 1) %&gt;%
+<pre class="r"><code># create normalised age column first
+df &lt;- df %&gt;% separate(age, into = c(&quot;year&quot;, &quot;month&quot;), sep = &quot;y&quot;) %&gt;%
+  mutate(month = as.numeric(gsub(&quot;m&quot;, &quot;&quot;, month)),
+         year = as.numeric(year),
+         age_in_months = year*12 + month)
+  
+mean_age &lt;- mean(df$age_in_months)
+sd_age &lt;- sd(df$age_in_months)
+df &lt;- df %&gt;%
+  mutate(age_normalized = as.numeric(scale(age_in_months)))
+
+
+df.tidy &lt;- df %&gt;% 
   separate(prime_time, into =c('min', 'sec'), sep = &quot;min&quot;) %&gt;%
   select(-unowned_post, -unowned_change) %&gt;% # not used in expt 1
-  separate(age, into = c(&quot;year&quot;, &quot;month&quot;), sep = &quot;y&quot;) %&gt;%
   mutate(sec = gsub(&quot;sec&quot;, &quot;&quot;, sec),
          sec = as.numeric(sec),
          min = as.numeric(min),
-         month = as.numeric(gsub(&quot;m&quot;, &quot;&quot;, month)),
-         year = as.numeric(year),
-         age_in_months = year*12 + month,
          prime_time_seconds = min*60 + sec,
          neutral_baseline = to.n(neutral_baseline),
          experimenter_post = to.n(experimenter_post),
@@ -312,14 +325,6 @@ m_ci &lt;- function(vector){ # a function to calculate cis of the mean
 <pre><code>##   totalDeviation
 ## 1              0</code></pre>
 <p>The “change” scores reported in the raw data are the same as “post” - “baseline”. Good.</p>
-</div>
-<div id="step-3-preprocessing" class="section level2">
-<h2>Step 3: Preprocessing</h2>
-<p>For ANCOVA, age is normalized</p>
-<pre class="r"><code>mean_age = mean(df.tidy$age_in_months)
-sd_age = sd(df.tidy$age_in_months)
-df.tidy &lt;- df.tidy %&gt;% 
-  mutate(age_normalized = (age_in_months - mean_age) / sd_age)</code></pre>
 </div>
 <div id="step-4-run-analysis" class="section level2">
 <h2>Step 4: Run analysis</h2>
@@ -392,10 +397,12 @@ forAOV &lt;- df.tidy %&gt;%
            object = factor(object),
            prime_type = factor(prime_type))
 
+spss &lt;- read_csv('data/spss.csv') %&gt;% mutate(participant_id = factor(ppid)) %&gt;% gather(object, response, child_change:experimenter_change, factor_key=TRUE) %&gt;% arrange(participant_id) %&gt;% rename(age_normalized = Zage) %&gt;% mutate(gender = factor(gender), object = factor(object), prime_type = factor(prime_type))
+forAOV &lt;- forAOV %&gt;% arrange(participant_id)
+
 # run ANCOVA
 aov_out &lt;- aov_ez(id = &quot;participant_id&quot;, dv = &quot;response&quot;, data = forAOV, between = c(&quot;prime_type&quot;, &quot;gender&quot;),
-within = c(&quot;object&quot;), covariate = &quot;age_normalized&quot;,
-observed = c(&quot;age_normalized&quot;), factorize = F, anova_table = list(correction = &quot;none&quot;, es = &quot;pes&quot;))
+within = c(&quot;object&quot;), covariate = &quot;age_normalized&quot;, observed = c(&quot;age_normalized&quot;), factorize = F, anova_table = list(correction = &quot;none&quot;, es = &quot;pes&quot;), type = 'III')
 
 kable(aov_out$anova_table)</code></pre>
 <table>
@@ -415,82 +422,82 @@ kable(aov_out$anova_table)</code></pre>
 <td>prime_type</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">0.5922056</td>
-<td align="right">0.0218589</td>
-<td align="right">0.5567241</td>
+<td align="right">2.172102</td>
+<td align="right">0.6102613</td>
+<td align="right">0.0225103</td>
+<td align="right">0.5469813</td>
 </tr>
 <tr class="even">
 <td>gender</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">0.4439143</td>
-<td align="right">0.0083062</td>
-<td align="right">0.5081291</td>
+<td align="right">2.172102</td>
+<td align="right">0.4580328</td>
+<td align="right">0.0085681</td>
+<td align="right">0.5014880</td>
 </tr>
 <tr class="odd">
 <td>age_normalized</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">7.3720834</td>
-<td align="right">0.1221108</td>
-<td align="right">0.0089221</td>
+<td align="right">2.172102</td>
+<td align="right">7.6785634</td>
+<td align="right">0.1265449</td>
+<td align="right">0.0076901</td>
 </tr>
 <tr class="even">
 <td>prime_type:gender</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">2.1319495</td>
-<td align="right">0.0744605</td>
-<td align="right">0.1286667</td>
+<td align="right">2.172102</td>
+<td align="right">2.1297366</td>
+<td align="right">0.0743890</td>
+<td align="right">0.1289305</td>
 </tr>
 <tr class="odd">
 <td>object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.5515933</td>
-<td align="right">0.0103002</td>
-<td align="right">0.4609466</td>
+<td align="right">1.510619</td>
+<td align="right">0.5516502</td>
+<td align="right">0.0103013</td>
+<td align="right">0.4609237</td>
 </tr>
 <tr class="even">
 <td>prime_type:object</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">4.8287312</td>
-<td align="right">0.1541311</td>
-<td align="right">0.0118449</td>
+<td align="right">1.510619</td>
+<td align="right">4.8305016</td>
+<td align="right">0.1541789</td>
+<td align="right">0.0118272</td>
 </tr>
 <tr class="odd">
 <td>gender:object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">2.6859482</td>
-<td align="right">0.0482339</td>
-<td align="right">0.1071605</td>
+<td align="right">1.510619</td>
+<td align="right">2.6893128</td>
+<td align="right">0.0482914</td>
+<td align="right">0.1069461</td>
 </tr>
 <tr class="even">
 <td>age_normalized:object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.0853397</td>
-<td align="right">0.0016076</td>
-<td align="right">0.7713280</td>
+<td align="right">1.510619</td>
+<td align="right">0.0908122</td>
+<td align="right">0.0017105</td>
+<td align="right">0.7643263</td>
 </tr>
 <tr class="odd">
 <td>prime_type:gender:object</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.1477901</td>
-<td align="right">0.0055461</td>
-<td align="right">0.8629664</td>
+<td align="right">1.510619</td>
+<td align="right">0.1481747</td>
+<td align="right">0.0055604</td>
+<td align="right">0.8626364</td>
 </tr>
 </tbody>
 </table>
@@ -502,98 +509,60 @@ compareValues(reportedValue = 2, obtainedValue = 2) # df1</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (2) and the obtained value (2) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 53, obtainedValue = 53) # df2</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (53) and the obtained value (53) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 4.83, obtainedValue = 4.8287312) # F</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 4.83, obtainedValue = 4.8305016) # F  </code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (4.83) and the obtained value (4.83) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .01, obtainedValue = 0.0118449, isP = T) # p</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .01, obtainedValue = 0.0118272, isP = T) # p</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.01) and the obtained value (0.01) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .15, obtainedValue = 0.1541311) # partial eta-squared</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .15, obtainedValue = 0.1541789) # partial eta-squared</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.15) and the obtained value (0.15) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
 <p>All matches.</p>
+<p>We initially had problems reproducing the means and confidence intervals. However, this was because we were calculating the sample means - the original authors informed us these values are in fact the estimated marginal means.</p>
 <blockquote>
 <p>We found no significant main effects of types of picture type (Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28], F(2, 53) = 0.61, p = 0.55, partial eta-squared = .02)</p>
 </blockquote>
-<pre class="r"><code>self &lt;- forAOV %&gt;% filter(prime_type == 'self') %&gt;% pull(response)
-other &lt;- forAOV %&gt;% filter(prime_type == 'other') %&gt;% pull(response)
-neutral &lt;- forAOV %&gt;% filter(prime_type == 'neutral') %&gt;% pull(response)
-
-self_m &lt;- mean(self)
-neutral_m &lt;- mean(neutral)
-other_m &lt;- mean(other)
-
-self_ci &lt;- m_ci(self)
-neutral_ci &lt;- m_ci(neutral)
-other_ci &lt;- m_ci(other)
-
-# descriptives 
-compareValues(reportedValue = 0.44, obtainedValue = self_m) # self mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.44) and the obtained value (0.55) differed by 25%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = -0.04, obtainedValue = self_ci[1]) # self lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (-0.04) and the obtained value (0.13) differed by 425%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.91, obtainedValue = self_ci[2]) # self upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.91) and the obtained value (0.97) differed by 6.59%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.51, obtainedValue = other_m) # other mean</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.51) and the obtained value (0.55) differed by 7.84%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.04, obtainedValue = other_ci[1]) # other lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.04) and the obtained value (0.08) differed by 100%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.98, obtainedValue = other_ci[2]) # other upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.98) and the obtained value (1.02) differed by 4.08%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.80, obtainedValue = neutral_m) # neutral mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.8) and the obtained value (0.6) differed by 25%. NB obtained value was rounded to 1 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.32, obtainedValue = neutral_ci[1]) # neutral lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.32) and the obtained value (0.17) differed by 46.88%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 1.28, obtainedValue = neutral_ci[2]) # neutral upper ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (1.28) and the obtained value (1.13) differed by 11.72%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code># descriptives
+lsmeans(aov_out, c(&quot;prime_type&quot;))</code></pre>
+<pre><code>##  prime_type    lsmean        SE df    lower.CL  upper.CL
+##  neutral    0.7373706 0.2365073 48  0.26184086 1.2129003
+##  other      0.6275580 0.2358728 48  0.15330406 1.1018120
+##  self       0.3850714 0.2406132 48 -0.09871391 0.8688567
+## 
+## Results are averaged over the levels of: gender, object 
+## Confidence level used: 0.95</code></pre>
 <pre class="r"><code># from anova table - prime_type -
 compareValues(reportedValue = 2, obtainedValue = 2) # df1</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (2) and the obtained value (2) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 53, obtainedValue = 53) # df2</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (53) and the obtained value (53) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .61, obtainedValue = .5922056) # F</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.61) and the obtained value (0.59) differed by 3.28%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .55, obtainedValue = .5567241, isP = T) # p</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.55) and the obtained value (0.56) differed by 1.82%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .02, obtainedValue = 0.0218589) # partial eta-squared</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .61, obtainedValue = 0.6102613) # F</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (0.61) and the obtained value (0.61) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .55, obtainedValue = 0.5469813, isP = T) # p</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (0.55) and the obtained value (0.55) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .02, obtainedValue = 0.0225103) # partial eta-squared</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.02) and the obtained value (0.02) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<p>For ANCOVA - All matches or minor numerical errors.</p>
-<p>But cannot reproduce most of the descriptive statistics.</p>
+<p>For ANCOVA output - All matches. Note that the marginal means and CIs don’t quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.</p>
 <blockquote>
 <p>or toy owner (Mchild = 0.67, 95% CIchild = [0.34, 0.99], Mexperimenter = 0.50, 95% CIexperimenter = [0.12, 0.89], F(1, 53) = 0.55, p = 0.46, partial eta-squared = .01).</p>
 </blockquote>
-<pre class="r"><code>child &lt;- forAOV %&gt;% filter(object == 'child') %&gt;% pull(response)
-exp &lt;- forAOV %&gt;% filter(object == 'experimenter') %&gt;% pull(response)
-
-child_m &lt;- mean(child)
-exp_m &lt;- mean(exp)
-
-child_ci &lt;- m_ci(child)
-exp_ci &lt;- m_ci(exp)
-
-
-# descriptives 
-compareValues(reportedValue = 0.67, obtainedValue = child_m) #  child mean</code></pre>
-<pre><code>## [1] &quot;MATCH. The reported value (0.67) and the obtained value (0.67) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.34, obtainedValue = child_ci[1]) # child lower ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.34) and the obtained value (0.32) differed by 5.88%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.99, obtainedValue = child_ci[2]) # child upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.99) and the obtained value (1.01) differed by 2.02%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.50, obtainedValue = exp_m) # exp mean</code></pre>
-<pre><code>## [1] &quot;MATCH. The reported value (0.5) and the obtained value (0.5) differed by 0%. NB obtained value was rounded to 1 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.12, obtainedValue = exp_ci[1]) # exp lower ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.12) and the obtained value (0.11) differed by 8.33%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.89, obtainedValue = exp_ci[2]) # exp upper ci</code></pre>
-<pre><code>## [1] &quot;MATCH. The reported value (0.89) and the obtained value (0.89) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>lsmeans(aov_out, c(&quot;object&quot;))</code></pre>
+<pre><code>##  object          lsmean        SE    df  lower.CL  upper.CL
+##  child        0.6509195 0.1805513 95.72 0.2925145 1.0093244
+##  experimenter 0.5157472 0.1805513 95.72 0.1573422 0.8741521
+## 
+## Results are averaged over the levels of: prime_type, gender 
+## Confidence level used: 0.95</code></pre>
 <pre class="r"><code># from anova table - object 
 compareValues(reportedValue = 1, obtainedValue = 1) # df1</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (1) and the obtained value (1) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 53, obtainedValue = 53) # df2</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (53) and the obtained value (53) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .55, obtainedValue = .5515933) # F</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .55, obtainedValue = 0.5516502) # F</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.55) and the obtained value (0.55) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .46, obtainedValue = .4309466, isP = T) # p</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.46) and the obtained value (0.43) differed by 6.52%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = .01, obtainedValue = 0.0103002) # partial eta-squared</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .46, obtainedValue = 0.4609237, isP = T) # p</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (0.46) and the obtained value (0.46) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = .01, obtainedValue = 0.0103013) # partial eta-squared</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.01) and the obtained value (0.01) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<p>In this case the there are only matches and minor numerical errors.</p>
+<p>For ANCOVA output - All matches. Note that the marginal means and CIs don’t quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.</p>
 <blockquote>
 <p>A significant effect of age was observed (F(1, 53) = 7.68, p = 0.01, partial eta-squared = .13), indicating that older children increased their valuations more than younger children regardless of toy owner or picture condition.</p>
 </blockquote>
@@ -601,12 +570,13 @@ compareValues(reportedValue = 1, obtainedValue = 1) # df1</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (1) and the obtained value (1) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 53, obtainedValue = 53) # df2</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (53) and the obtained value (53) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 7.68, obtainedValue = 7.3720834) # F</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (7.68) and the obtained value (7.37) differed by 4.04%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.01, obtainedValue = 0.0089221, isP = T) # p</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 7.68, obtainedValue = 7.6785634) # F</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (7.68) and the obtained value (7.68) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 0.01, obtainedValue = 0.0076901, isP = T) # p</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.01) and the obtained value (0.01) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.13, obtainedValue = 0.1221108) # partial eta squared</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.13) and the obtained value (0.12) differed by 7.69%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 0.13, obtainedValue = 0.1265449) # partial eta squared</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (0.13) and the obtained value (0.13) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<p>All matches.</p>
 <blockquote>
 <p>No significant effect of gender (F(1, 53) = 0.46, p = 0.50, partial eta-squared = .01),</p>
 </blockquote>
@@ -614,11 +584,11 @@ compareValues(reportedValue = 1, obtainedValue = 1) # df1</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (1) and the obtained value (1) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 53, obtainedValue = 53) # df2</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (53) and the obtained value (53) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.46, obtainedValue = 0.4439143) # F</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.46) and the obtained value (0.44) differed by 4.35%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.50, obtainedValue = 0.5081291, isP = T) # p</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 0.46, obtainedValue = 0.4580328) # F</code></pre>
+<pre><code>## [1] &quot;MATCH. The reported value (0.46) and the obtained value (0.46) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 0.50, obtainedValue = 0.5469813, isP = T) # p</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.5) and the obtained value (0.5) differed by 0%. NB obtained value was rounded to 1 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.01, obtainedValue = 0.0083062) # partial eta squared</code></pre>
+<pre class="r"><code>compareValues(reportedValue = 0.01, obtainedValue = 0.0085681) # partial eta squared</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.01) and the obtained value (0.01) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
 <blockquote>
 <p>and no significant interactions involving gender or age were observed (Fs &lt; 2.69, ps &gt; 0.11, etc.).</p>
@@ -641,82 +611,82 @@ compareValues(reportedValue = 1, obtainedValue = 1) # df1</code></pre>
 <td>prime_type</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">0.5922056</td>
-<td align="right">0.0218589</td>
-<td align="right">0.5567241</td>
+<td align="right">2.172102</td>
+<td align="right">0.6102613</td>
+<td align="right">0.0225103</td>
+<td align="right">0.5469813</td>
 </tr>
 <tr class="even">
 <td>gender</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">0.4439143</td>
-<td align="right">0.0083062</td>
-<td align="right">0.5081291</td>
+<td align="right">2.172102</td>
+<td align="right">0.4580328</td>
+<td align="right">0.0085681</td>
+<td align="right">0.5014880</td>
 </tr>
 <tr class="odd">
 <td>age_normalized</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">7.3720834</td>
-<td align="right">0.1221108</td>
-<td align="right">0.0089221</td>
+<td align="right">2.172102</td>
+<td align="right">7.6785634</td>
+<td align="right">0.1265449</td>
+<td align="right">0.0076901</td>
 </tr>
 <tr class="even">
 <td>prime_type:gender</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">2.183128</td>
-<td align="right">2.1319495</td>
-<td align="right">0.0744605</td>
-<td align="right">0.1286667</td>
+<td align="right">2.172102</td>
+<td align="right">2.1297366</td>
+<td align="right">0.0743890</td>
+<td align="right">0.1289305</td>
 </tr>
 <tr class="odd">
 <td>object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.5515933</td>
-<td align="right">0.0103002</td>
-<td align="right">0.4609466</td>
+<td align="right">1.510619</td>
+<td align="right">0.5516502</td>
+<td align="right">0.0103013</td>
+<td align="right">0.4609237</td>
 </tr>
 <tr class="even">
 <td>prime_type:object</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">4.8287312</td>
-<td align="right">0.1541311</td>
-<td align="right">0.0118449</td>
+<td align="right">1.510619</td>
+<td align="right">4.8305016</td>
+<td align="right">0.1541789</td>
+<td align="right">0.0118272</td>
 </tr>
 <tr class="odd">
 <td>gender:object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">2.6859482</td>
-<td align="right">0.0482339</td>
-<td align="right">0.1071605</td>
+<td align="right">1.510619</td>
+<td align="right">2.6893128</td>
+<td align="right">0.0482914</td>
+<td align="right">0.1069461</td>
 </tr>
 <tr class="even">
 <td>age_normalized:object</td>
 <td align="right">1</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.0853397</td>
-<td align="right">0.0016076</td>
-<td align="right">0.7713280</td>
+<td align="right">1.510619</td>
+<td align="right">0.0908122</td>
+<td align="right">0.0017105</td>
+<td align="right">0.7643263</td>
 </tr>
 <tr class="odd">
 <td>prime_type:gender:object</td>
 <td align="right">2</td>
 <td align="right">53</td>
-<td align="right">1.510775</td>
-<td align="right">0.1477901</td>
-<td align="right">0.0055461</td>
-<td align="right">0.8629664</td>
+<td align="right">1.510619</td>
+<td align="right">0.1481747</td>
+<td align="right">0.0055604</td>
+<td align="right">0.8626364</td>
 </tr>
 </tbody>
 </table>
@@ -726,27 +696,28 @@ compareValues(reportedValue = 1, obtainedValue = 1) # df1</code></pre>
 </blockquote>
 <pre class="r"><code>child &lt;- forAOV %&gt;% filter(prime_type == 'self', object == 'child') %&gt;% pull(response)
 experimenter &lt;- forAOV %&gt;% filter(prime_type == 'self', object == 'experimenter') %&gt;% pull(response)
-child_m &lt;- mean(child)
-exp_m &lt;- mean(experimenter)
-child_ci &lt;- m_ci(child)
-exp_ci &lt;- m_ci(experimenter)
-t_out &lt;- t.test(child, experimenter, paired = T)
+
+# descriptives
+lsmeans(aov_out, c(&quot;prime_type&quot;), by = 'object')</code></pre>
+<pre><code>## object = child:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.8326951 0.3176075 94.87  0.20215362 1.4632366
+##  other       0.2420245 0.3160214 94.76 -0.38537735 0.8694264
+##  self        0.8780388 0.3277852 95.42  0.22734014 1.5287374
+## 
+## object = experimenter:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.6420460 0.3176075 94.87  0.01150454 1.2725875
+##  other       1.0130915 0.3160214 94.76  0.38568958 1.6404934
+##  self       -0.1078959 0.3277852 95.42 -0.75859456 0.5428027
+## 
+## Results are averaged over the levels of: gender 
+## Confidence level used: 0.95</code></pre>
+<pre class="r"><code>t_out &lt;- t.test(child, experimenter, paired = T)
 p &lt;- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
 d &lt;- cohensD(child, experimenter, method = 'pooled')
 
-compareValues(reportedValue = 0.95, obtainedValue = child_m) # mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.95) and the obtained value (1.05) differed by 10.53%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.38, obtainedValue = child_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.38) and the obtained value (0.58) differed by 52.63%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 1.52, obtainedValue = child_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MATCH. The reported value (1.52) and the obtained value (1.52) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = -0.07, obtainedValue = exp_m) # mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (-0.07) and the obtained value (0.05) differed by 171.43%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = -0.74, obtainedValue = exp_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (-0.74) and the obtained value (-0.6) differed by 18.92%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.59, obtainedValue = exp_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.59) and the obtained value (0.7) differed by 18.64%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
+compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (19) and the obtained value (19) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 3.56, obtainedValue = t_out$statistic) # t</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (3.56) and the obtained value (3.56) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
@@ -754,33 +725,34 @@ compareValues(reportedValue = 0.95, obtainedValue = child_m) # mean</code></pre>
 <pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.81) and the obtained value (0.82) differed by 1.23%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = .01, obtainedValue = p, isP = T) # p </code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.01) and the obtained value (0.01) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<p>Strangely it seems that we can reproduce the t-test output but not the means and cis.</p>
+<p>For t-test output - All matches. Note that the marginal means and CIs don’t quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.</p>
 <blockquote>
 <p>The opposite pattern of responses were observed in the other-focus condition, in which children valued the experimenter’s toy higher (M = 0.86, 95% CI = [0.20, 1.51]), but not their own toy (M = 0.17, 95% CI = [−0.39, 0.73]) - although this effect was not statistically significant (t(19) = −1.61, p = 0.36, d = 0.48, Bonferroni corrected).</p>
 </blockquote>
 <pre class="r"><code>child &lt;- forAOV %&gt;% filter(prime_type == 'other', object == 'child') %&gt;% pull(response)
 experimenter &lt;- forAOV %&gt;% filter(prime_type == 'other', object == 'experimenter') %&gt;% pull(response)
-child_m &lt;- mean(child)
-exp_m &lt;- mean(experimenter)
-child_ci &lt;- m_ci(child)
-exp_ci &lt;- m_ci(experimenter)
-t_out &lt;- t.test(child, experimenter, paired = T)
+
+# descriptives
+lsmeans(aov_out, c(&quot;prime_type&quot;), by = 'object')</code></pre>
+<pre><code>## object = child:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.8326951 0.3176075 94.87  0.20215362 1.4632366
+##  other       0.2420245 0.3160214 94.76 -0.38537735 0.8694264
+##  self        0.8780388 0.3277852 95.42  0.22734014 1.5287374
+## 
+## object = experimenter:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.6420460 0.3176075 94.87  0.01150454 1.2725875
+##  other       1.0130915 0.3160214 94.76  0.38568958 1.6404934
+##  self       -0.1078959 0.3277852 95.42 -0.75859456 0.5428027
+## 
+## Results are averaged over the levels of: gender 
+## Confidence level used: 0.95</code></pre>
+<pre class="r"><code>t_out &lt;- t.test(child, experimenter, paired = T)
 p &lt;- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
 d &lt;- cohensD(child, experimenter, method = 'pooled')
 
-compareValues(reportedValue = 0.17, obtainedValue = child_m) # mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.17) and the obtained value (0.2) differed by 17.65%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = -0.39, obtainedValue = child_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (-0.39) and the obtained value (-0.51) differed by 30.77%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.73, obtainedValue = child_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.73) and the obtained value (0.91) differed by 24.66%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.86, obtainedValue = exp_m) # mean</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.86) and the obtained value (0.9) differed by 4.65%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.20, obtainedValue = exp_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MATCH. The reported value (0.2) and the obtained value (0.2) differed by 0%. NB obtained value was rounded to 1 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 1.51, obtainedValue = exp_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (1.51) and the obtained value (1.56) differed by 3.31%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
+compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (19) and the obtained value (19) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = -1.61, obtainedValue = t_out$statistic) # t</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (-1.61) and the obtained value (-1.61) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
@@ -788,32 +760,33 @@ compareValues(reportedValue = 0.17, obtainedValue = child_m) # mean</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.48) and the obtained value (0.48) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = .36, obtainedValue = p, isP = T) # p </code></pre>
 <pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (0.36) and the obtained value (0.37) differed by 2.78%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<p>Again it seems that we can reproduce the t-test output but not all of the means and cis.</p>
+<p>For t-test output - All matches. Note that the marginal means and CIs don’t quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.</p>
 <blockquote>
 <p>There was no significant effect of toy owner in the neutral-focus condition (Mchild = 0.89, 95% CIchild = [0.31, 1.46], Mexperimenter = 0.71, 95% CIexperimenter = [0.04, 1.38], t(19) = 0.48, p = 0.64, d = 0.13).</p>
 </blockquote>
 <pre class="r"><code>child &lt;- forAOV %&gt;% filter(prime_type == 'neutral', object == 'child') %&gt;% pull(response)
 experimenter &lt;- forAOV %&gt;% filter(prime_type == 'neutral', object == 'experimenter') %&gt;% pull(response)
-child_m &lt;- mean(child)
-exp_m &lt;- mean(experimenter)
-child_ci &lt;- m_ci(child)
-exp_ci &lt;- m_ci(experimenter)
-t_out &lt;- t.test(child, experimenter, paired = T)
+
+# descriptives
+lsmeans(aov_out, c(&quot;prime_type&quot;), by = 'object')</code></pre>
+<pre><code>## object = child:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.8326951 0.3176075 94.87  0.20215362 1.4632366
+##  other       0.2420245 0.3160214 94.76 -0.38537735 0.8694264
+##  self        0.8780388 0.3277852 95.42  0.22734014 1.5287374
+## 
+## object = experimenter:
+##  prime_type     lsmean        SE    df    lower.CL  upper.CL
+##  neutral     0.6420460 0.3176075 94.87  0.01150454 1.2725875
+##  other       1.0130915 0.3160214 94.76  0.38568958 1.6404934
+##  self       -0.1078959 0.3277852 95.42 -0.75859456 0.5428027
+## 
+## Results are averaged over the levels of: gender 
+## Confidence level used: 0.95</code></pre>
+<pre class="r"><code>t_out &lt;- t.test(child, experimenter, paired = T)
 d &lt;- cohensD(child, experimenter, method = 'pooled')
 
-compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.89) and the obtained value (0.75) differed by 15.73%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.31, obtainedValue = child_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.31) and the obtained value (0.13) differed by 58.06%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 1.46, obtainedValue = child_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (1.46) and the obtained value (1.37) differed by 6.16%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.71, obtainedValue = exp_m) # mean</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.71) and the obtained value (0.55) differed by 22.54%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 0.04, obtainedValue = exp_ci[1]) # lower ci</code></pre>
-<pre><code>## [1] &quot;MAJOR NUMERICAL ERROR. The reported value (0.04) and the obtained value (-0.25) differed by 725%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 1.38, obtainedValue = exp_ci[2]) # upper ci</code></pre>
-<pre><code>## [1] &quot;MINOR NUMERICAL ERROR. The reported value (1.38) and the obtained value (1.35) differed by 2.17%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
-<pre class="r"><code>compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
+compareValues(reportedValue = 19, obtainedValue = t_out$parameter[['df']]) # df</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (19) and the obtained value (19) differed by 0%. NB obtained value was rounded to 0 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = 0.48, obtainedValue = t_out$statistic) # t</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.48) and the obtained value (0.48) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
@@ -821,6 +794,7 @@ compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean</code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.13) and the obtained value (0.13) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
 <pre class="r"><code>compareValues(reportedValue = .64, obtainedValue = t_out$p.value, isP = T) # p </code></pre>
 <pre><code>## [1] &quot;MATCH. The reported value (0.64) and the obtained value (0.64) differed by 0%. NB obtained value was rounded to 2 decimal places.&quot;</code></pre>
+<p>For t-test output - All matches. Note that the marginal means and CIs don’t quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.</p>
 </div>
 </div>
 <div id="step-5-conclusion" class="section level2">
@@ -829,9 +803,9 @@ compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean</code></pre>
           Article_ID = 'JcuWB', 
           Insufficient_Information_Errors = 0,
           Decision_Errors = 0, 
-          Major_Numerical_Errors = 18, 
-          Minor_Numerical_Errors = 6,
-          Author_Assistance = F)</code></pre>
+          Major_Numerical_Errors = 0, 
+          Minor_Numerical_Errors = 2,
+          Author_Assistance = T)</code></pre>
 <table>
 <thead>
 <tr class="header">
@@ -846,12 +820,14 @@ compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean</code></pre>
 <tr class="odd">
 <td align="right">0</td>
 <td align="right">0</td>
-<td align="right">18</td>
-<td align="right">6</td>
-<td align="left">Failure</td>
+<td align="right">0</td>
+<td align="right">2</td>
+<td align="left">Success with author assistance</td>
 </tr>
 </tbody>
 </table>
+<p>We initially ran into difficulties with this reproducibility check. Specifically, we were able to reproduce the output of the ANCOVA and t-tests failrly closely, but many of the means and CIs were not matching up. The original authors informed us that these values were in fact marginal means rather than sample means. We attempted to calculate the marginal means with the R function lsmeans, and came much closer, but still could not reporduce some values. However, the authors have provided SPSS syntax which can be used to reproduce the values reported in the article.</p>
+<p>Provision of the SPSS syntax and corresponding data file also enabled us to solve a secondary issue. We noticed that our normalized age values did not match up exactly with those in the SPSS file. Eventually, we identified the source of the problem - in the original data file, the age for participant 103 is given as “4y8m” i.e, 56 months. However, in the SPSS data file the age for this participant is given as 57 months. When we changed the age to 57, the normalised values matched up.</p>
 <pre class="r"><code>devtools::session_info()</code></pre>
 <pre><code>##  setting  value                       
 ##  version  R version 3.3.2 (2016-10-31)
@@ -860,7 +836,7 @@ compareValues(reportedValue = 0.89, obtainedValue = child_m) # mean</code></pre>
 ##  language (EN)                        
 ##  collate  en_US.UTF-8                 
 ##  tz       America/Los_Angeles         
-##  date     2017-10-31                  
+##  date     2017-11-01                  
 ## 
 ##  package      * version date      
 ##  acepack        1.4.1   2016-10-29
