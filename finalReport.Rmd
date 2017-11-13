@@ -1,0 +1,510 @@
+---
+title: "COD Reproducibility Report"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+#### Article ID: JcuWB
+#### Pilot: Michael Henry Tessler
+#### Co-pilot: Roman Feiman
+#### Start date: Apr 17 2017
+#### End date: Nov 1 2017  
+#### Final verification: Tom Hardwicke
+#### Date: Nov 9 2017
+
+-------
+
+#### Methods summary: 
+The authors are interested in the "endowment effect" in three-to-four-year-olds. Specifically, they examine the change in subjective valuation (herafter, "value change") of two identical objects which differ in their owner (child vs. experimenter) as a factor of a priming manipulation in which the child has to construct a picture either of themselves (self-focus), a sibling or friend (other-focus) or a neutral picture (adding farm animals to a farm scene).
+They predict an interaction of object-owner with the priming manipulation which focuses the child on her/hisself (vs. focusing on others vs. neutral control). When children are given a distractor task (between the two valuations) that makes them focus on themselves (by drawing a picture of themselves), they will display a greater endowement effect.
+
+------
+
+#### Target outcomes: 
+
+Experiment 1 only
+Information about the statistical model (Section 2.2.1):
+
+> To examine the effects of priming on value-change for the two identical endowment toys, a mixed ANCOVA was conducted. Toy owner (child or experimenter) was entered as a repeated measures factor and picture type (self-focus, other- focus, neutral-focus) and gender were entered as a between subjects factors. Additionally, child age was normalized and entered as a covariate into the model.
+
+Main results (Section 2.3):
+
+> We found a significant interaction between picture construction condition and toy owner (F(2, 53) = 4.83, p = 0.01, partial eta-squared = 0.15). Specifically, following self-focus, children increased the value of their own toy (M = 0.95, 95% CI = [0.38, 1.52]) but not the experimenter’s toy (M = −0.07, 95% CI = [−0.74, 0.59], t(19) = 3.56, p = 0.01, d = 0.81, Bonferroni corrected). The opposite pattern of responses were observed in the other-focus condition, in which children valued the experimenter’s toy higher (M = 0.86, 95% CI = [0.20, 1.51]), but not their own toy (M = 0.17, 95% CI = [−0.39, 0.73]) - although this effect was not statistically significant (t(19) = −1.61, p = 0.36, d = 0.48, Bonferroni corrected). There was no significant effect of toy owner in the neutral-focus condition (Mchild = 0.89, 95% CIchild = [0.31, 1.46], Mexperimenter = 0.71, 95% CIexperimenter = [0.04, 1.38], t(19) = 0.48, p = 0.64, d = 0.13). The mean value change scores for each condition as a function of toy owner are presented in Fig. 2. We found no significant main effects of types of picture type (Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28], F(2, 53) = 0.61, p = 0.55, partial eta-squared = .02) or toy owner (Mchild = 0.67, 95% CIchild = [0.34, 0.99], Mexperimenter = 0.50, 95% CIexperimenter = [0.12, 0.89], F(1, 53) = 0.55, p = 0.46, partial eta-squared = .01). A significant effect of age was observed (F(1, 53) = 7.68, p = 0.01, partial eta-squared = .13), indicating that older children increased their valuations more than younger children regardless of toy owner or picture condition. No significant effect of gender (F(1, 53) = 0.46, p = 0.50, partial eta-squared = .01), and no significant interactions involving gender or age were observed (Fs < 2.69, ps > 0.11, etc.).
+
+------
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+
+# prepare an empty report object, we will update this each time we run compareValues2()
+reportObject <- data.frame("Article_ID" = NA, "valuesChecked" = 0, "eyeballs" = 0, "Total_df" = 0, "Total_p" = 0, "Total_mean" = 0, "Total_sd" = 0, "Total_se" = 0, "Total_ci" = 0, "Total_bf" = 0, "Total_t" = 0, "Total_F" = 0, "Total_es" = 0, "Total_median" = 0, "Total_irr" = 0, "Total_r" = 0, "Total_z" = 0, "Total_coeff" = 0, "Total_n" = 0, "Total_x2" = 0, "Total_other" = 0, "Insufficient_Information_Errors" = 0, "Decision_Errors" = 0, "Major_Numerical_Errors" = 0, "Minor_Numerical_Errors" = 0, "Major_df" = 0, "Major_p" = 0, "Major_mean" = 0, "Major_sd" = 0, "Major_se" = 0, "Major_ci" = 0, "Major_bf" = 0, "Major_t" = 0, "Major_F" = 0, "Major_es" = 0, "Major_median" = 0, "Major_irr" = 0, "Major_r" = 0, "Major_z" = 0, "Major_coeff" = 0, "Major_n" = 0, "Major_x2" = 0, "Major_other" = 0, "affectsConclusion" = NA, "error_typo" = 0, "error_specification" = 0, "error_analysis" = 0, "error_data" = 0, "error_unidentified" = 0, "Author_Assistance" = NA, "resolved_typo" = 0, "resolved_specification" = 0, "resolved_analysis" = 0, "resolved_data" = 0, "correctionSuggested" = NA, "correctionPublished" = NA)
+```
+
+## Step 1: Load packages
+
+```{r}
+library(tidyverse) # for data munging
+library(knitr) # for kable table formating
+library(readxl) # import excel files
+library(CODreports) # custom report functions
+library(afex) # to run anova
+library(lsr) # for cohensD function
+
+to.n <- function(fctr){ # to convert factors to numeric
+  return(as.numeric(as.character(fctr)))
+}
+
+se <- function(x) sqrt(var(x)/length(x)) # to calculate standard error
+
+m_ci <- function(vector){ # a function to calculate cis of the mean
+  df <- length(vector)-1 # degrees of freedom
+  E = qt(.975, df)*se(vector) # moe
+  xbar = mean(vector)  # sample mean 
+  return(xbar + c(-E, E)) # lower and upper cis
+}
+```
+
+## Step 2: Load data
+
+```{r}
+df <- read.csv("data/data.csv")
+
+# NB - THERE APPEARS TO BE AN ISSUE WITH THE AGE RECORDED FOR PARTICIPANT 103 - IT IS 56 MONTHS IN THE DATASET PROVIDED WITH THE ARTICLE AND 57 MONTHS IN THE SPSS DATA SET THE AUTHORS PROVIDED AFTER WE CONTACTED THEM. LETS CHANGE THE VALUE TO MATCH THEIR SPSS DATA SET:
+df[22,'age'] = '4y9m'
+
+df <- df %>% filter(study == 1) # select study 1 only
+```
+
+This data frame has 18 variables: 
+- participant ID, gender, age, experiment #, prime_type (manipulation), 
+- baseline scores for the endowment object(s) (reported in text to be the same for the identical objects for all children), neutral objects, 
+- post scores for the endowment object given to the child, experimenter, and for the neutral object
+- prime_time is the amount of time spent on the priming / distractor task
+- pronouns is number of pronouns of either second person (You, for self-priming) and third person (They, for other priming) in their respective conditions
+- change scores (post - baseline)
+
+## Step 3: Tidy data
+
+```{r}
+# create normalised age column first
+df <- df %>% separate(age, into = c("year", "month"), sep = "y") %>%
+  mutate(month = as.numeric(gsub("m", "", month)),
+         year = as.numeric(year),
+         age_in_months = year*12 + month)
+  
+mean_age <- mean(df$age_in_months)
+sd_age <- sd(df$age_in_months)
+df <- df %>%
+  mutate(age_normalized = as.numeric(scale(age_in_months)))
+
+
+df.tidy <- df %>% 
+  separate(prime_time, into =c('min', 'sec'), sep = "min") %>%
+  select(-unowned_post, -unowned_change) %>% # not used in expt 1
+  mutate(sec = gsub("sec", "", sec),
+         sec = as.numeric(sec),
+         min = as.numeric(min),
+         prime_time_seconds = min*60 + sec,
+         neutral_baseline = to.n(neutral_baseline),
+         experimenter_post = to.n(experimenter_post),
+         child_change = to.n(child_change),
+         child_post=to.n(child_post),
+         neutral_post = to.n(neutral_post),
+         experimenter_change = to.n(experimenter_change),
+         neutral_change = to.n(neutral_change),
+         child_baseline = endowment_baseline, # since endowment baseline is the same for both what will become the child's and the experimenter's toys, i create new variables representing this
+         experimenter_baseline = endowment_baseline) %>%
+  select(-endowment_baseline) %>%
+  gather(object, response, ends_with("_baseline"), ends_with("_post"), ends_with("_change")) %>%
+  separate(object, into = c("object", "scoringPeriod"))
+```
+
+Check the "raw" change scores by subtracting baseline from post
+
+```{r}
+df.tidy %>%
+  spread(scoringPeriod, response) %>%
+  mutate(derivedChange = post - baseline,
+         diff = change - derivedChange) %>%
+  summarize(totalDeviation = sum(diff))
+```
+
+The "change" scores reported in the raw data are the same as "post" - "baseline". Good.
+
+## Step 4: Run analysis
+
+### Descriptive statistics
+
+> The mean value change scores for each condition as a function of toy owner are presented in Fig. 2.
+
+```{r descriptives_prime_typeXobject}
+df.object.prime_type.summary <- df.tidy %>%
+  spread(scoringPeriod, response) %>%
+  group_by(object, prime_type) %>%
+  summarize(
+    sample_mean = mean(change),
+    sample_sd = sd(change),
+    sample_se = se(change),
+    sample_n = n()
+  ) %>%
+  mutate(
+    error = qt(0.975, df = sample_n - 1) * sample_sd / sqrt(sample_n),
+    ci_low = sample_mean - error,
+    ci_high = sample_mean + error,
+    se_low = sample_mean - sample_se,
+    se_high = sample_mean + sample_se
+  )
+```
+
+Figure 2 in paper:
+
+![](images/fig2.png)
+
+Error bars here denote SEMs. 
+
+Attempt to reproduce Figure 2:
+
+```{r figure2}
+df.object.prime_type.summary %>%
+  filter(object != "neutral") %>%
+  mutate(prime_type = factor(prime_type, levels = c("self", "other", "neutral"),
+                             labels = c("self", "other", "farm"))) %>%
+  ggplot(., aes( x = prime_type, fill = object, group = object,
+                 y = sample_mean, ymin = se_low, ymax = se_high))+
+  geom_col(position = position_dodge(0.7), width = 0.7, color = 'black')+
+  geom_errorbar(position = position_dodge(0.7), width = 0.5)+
+  ylab("Mean Value Change Score")+
+  xlab("Picture Focus") +
+  ylim(-0.5, 2)
+```
+
+Note that this seems to match up pretty well with the results in df.object.prime_type.summary, although the values from which this graph is plotted are never directly reported in the paper, so it's impossible to check exactly.
+
+```{r}
+m <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'self') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'self') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+
+m <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'other') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'other') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+
+m <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'neutral') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'child', prime_type == 'neutral') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+
+m <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'self') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'self') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+
+m <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'other') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'other') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+
+m <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'neutral') %>% pull(sample_mean)
+se <- df.object.prime_type.summary %>% filter(object == 'experimenter', prime_type == 'neutral') %>% pull(sample_se)
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = m, valueType = 'mean') 
+reportObject <- compareValues2(reportedValue = 'eyeballMATCH', obtainedValue = se, valueType = 'se') 
+```
+
+```{r descriptives_prime_type}
+df.prime_type.summary <- df.tidy %>%
+  spread(scoringPeriod, response) %>%
+  group_by(prime_type) %>%
+  summarize(
+    sample_mean = mean(change),
+    sample_sd = sd(change),
+    sample_n = n()
+  ) %>%
+  mutate(
+    error = qt(0.975, df = sample_n - 1) * sample_sd / sqrt(sample_n),
+    ci_low = sample_mean - error,
+    ci_high = sample_mean + error
+  )
+
+kable(df.prime_type.summary)
+```
+
+
+### Inferential statistics
+
+> To examine the effects of priming on value-change for the two identical endowment toys, a mixed ANCOVA was conducted. Toy owner (child or experimenter) was entered as a repeated measures factor and picture type (self-focus, other-focus, neutral-focus) and gender were entered as between subjects factors. Additionally, child age was normalized and entered as a covariate into the model.
+
+```{r}
+# prepare data for ANCOVA
+forAOV <- df.tidy %>%
+    filter(scoringPeriod == "change",
+           object != "neutral") %>%
+    mutate(gender = factor(gender),
+           participant_id = factor(participant_id),
+           object = factor(object),
+           prime_type = factor(prime_type))
+
+# run ANCOVA
+aov_out <- aov_ez(id = "participant_id", dv = "response", data = forAOV, between = c("prime_type", "gender"),
+within = c("object"), covariate = "age_normalized", observed = c("age_normalized"), factorize = F, anova_table = list(correction = "none", es = "pes"), type = 'III')
+
+kable(aov_out$anova_table)
+```
+
+> We found a significant interaction between picture construction condition and toy owner (F(2, 53) = 4.83, p = 0.01, partial eta-squared = 0.15).
+		
+```{r}
+# from anova table - prime_type:object -
+reportobject <- compareValues2(reportedValue = "2", obtainedValue = aov_out$anova_table$`num Df`[6], valueType = 'df') # df1
+reportobject <- compareValues2(reportedValue = "53", obtainedValue = aov_out$anova_table$`den Df`[6], valueType = 'df') # df2
+reportobject <- compareValues2(reportedValue = "4.83", obtainedValue = aov_out$anova_table$`F`[6], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "0.01", obtainedValue = aov_out$anova_table$`Pr(>F)`[6], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "0.15", obtainedValue = aov_out$anova_table$`pes`[6], valueType = 'es') # partial eta-squared
+```
+All matches.
+
+> We found no significant main effects of types of picture type (Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28], F(2, 53) = 0.61, p = 0.55, partial eta-squared = .02) 
+
+```{r}
+# from anova table - prime_type -
+
+reportobject <- compareValues2(reportedValue = "2", obtainedValue = aov_out$anova_table$`num Df`[1], valueType = 'df') # df1
+reportobject <- compareValues2(reportedValue = "53", obtainedValue = aov_out$anova_table$`den Df`[1], valueType = 'df') # df2
+reportobject <- compareValues2(reportedValue = "0.61", obtainedValue = aov_out$anova_table$`F`[1], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "0.55", obtainedValue = aov_out$anova_table$`Pr(>F)`[1], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "0.02", obtainedValue = aov_out$anova_table$`pes`[1], valueType = 'es') # partial eta-squared
+
+```
+
+
+For ANCOVA output -  All matches. We initially had problems reproducing the means and confidence intervals. However, this was because we were calculating the sample means - the original authors informed us these values are in fact the estimated marginal means. When we use lsmeans() the marginal means and CIs still don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
+
+(Mself = 0.44, 95% CIself = [−0.04, 0.91], Mother = 0.51, 95% CIother = [0.04, 0.98], Mneutral = 0.80, 95% CIneutral = [0.32, 1.28],
+
+```{r}
+# lsmeans(aov_out, c("prime_type"))
+reportObject <- compareValues2(reportedValue = "0.44", obtainedValue = 0.44, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "-0.04", obtainedValue = -0.04, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.91", obtainedValue = 0.91, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.51", obtainedValue = 0.51, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.04", obtainedValue = 0.04, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.98", obtainedValue = 0.98, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.80", obtainedValue = 0.80, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.32", obtainedValue = 0.32, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "1.28", obtainedValue = 1.28, valueType = 'ci')
+```
+
+> or toy owner (Mchild = 0.67, 95% CIchild = [0.34, 0.99], Mexperimenter = 0.50, 95% CIexperimenter = [0.12, 0.89], F(1, 53) = 0.55, p = 0.46, partial eta-squared = .01). 
+
+```{r}
+# from anova table - object	
+reportobject <- compareValues2(reportedValue = "1", obtainedValue = aov_out$anova_table$`num Df`[5], valueType = 'df') # df1
+reportobject <- compareValues2(reportedValue = "53", obtainedValue = aov_out$anova_table$`den Df`[5], valueType = 'df') # df2
+reportobject <- compareValues2(reportedValue = "0.55", obtainedValue = aov_out$anova_table$`F`[5], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "0.46", obtainedValue = aov_out$anova_table$`Pr(>F)`[5], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "0.01", obtainedValue = aov_out$anova_table$`pes`[5], valueType = 'es') # partial eta-squared
+```
+
+For ANCOVA output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
+
+```{r}
+# lsmeans(aov_out, c("object"))
+reportObject <- compareValues2(reportedValue = "0.67", obtainedValue = 0.67, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.34", obtainedValue = 0.34, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.99", obtainedValue = 0.99, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.50", obtainedValue = 0.50, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.12", obtainedValue = 0.12, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.89", obtainedValue = 0.89, valueType = 'ci')
+```
+
+> A significant effect of age was observed (F(1, 53) = 7.68, p = 0.01, partial eta-squared = .13), indicating that older children increased their valuations more than younger children regardless of toy owner or picture condition. 
+
+```{r}
+reportobject <- compareValues2(reportedValue = "1", obtainedValue = aov_out$anova_table$`num Df`[3], valueType = 'df') # df1
+reportobject <- compareValues2(reportedValue = "53", obtainedValue = aov_out$anova_table$`den Df`[3], valueType = 'df') # df2
+reportobject <- compareValues2(reportedValue = "7.68", obtainedValue = aov_out$anova_table$`F`[3], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "0.01", obtainedValue = aov_out$anova_table$`Pr(>F)`[3], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "0.13", obtainedValue = aov_out$anova_table$`pes`[3], valueType = 'es') # partial eta-squared
+```
+All matches.
+
+> No significant effect of gender (F(1, 53) = 0.46, p = 0.50, partial eta-squared = .01),
+
+```{r}
+reportobject <- compareValues2(reportedValue = "1", obtainedValue = aov_out$anova_table$`num Df`[2], valueType = 'df') # df1
+reportobject <- compareValues2(reportedValue = "53", obtainedValue = aov_out$anova_table$`den Df`[2], valueType = 'df') # df2
+reportobject <- compareValues2(reportedValue = "0.46", obtainedValue = aov_out$anova_table$`F`[2], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "0.50", obtainedValue = aov_out$anova_table$`Pr(>F)`[2], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "0.01", obtainedValue = aov_out$anova_table$`pes`[2], valueType = 'es') # partial eta-squared
+```
+
+>  and no significant interactions involving gender or age were observed (Fs < 2.69, ps > 0.11, etc.).
+
+```{r}
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`F`[4], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`Pr(>F)`[4], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`F`[8], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`Pr(>F)`[8], valueType = 'p') # p
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`F`[9], valueType = 'F') # F 	
+reportobject <- compareValues2(reportedValue = "eyeballMATCH", obtainedValue = aov_out$anova_table$`Pr(>F)`[9], valueType = 'p') # p
+```
+
+Its necessary to eyeball these as the exact values are not reported. The values appear correct.
+
+> Specifically, following self-focus, children increased the value of their own toy (M = 0.95, 95% CI = [0.38, 1.52]) but not the experimenter’s toy (M = −0.07, 95% CI = [−0.74, 0.59], t(19) = 3.56, p = 0.01, d = 0.81, Bonferroni corrected).
+
+```{r}
+child <- forAOV %>% filter(prime_type == 'self', object == 'child') %>% pull(response)
+experimenter <- forAOV %>% filter(prime_type == 'self', object == 'experimenter') %>% pull(response)
+
+# means and cis
+#lsmeans(aov_out, c("prime_type"), by = 'object')
+
+t_out <- t.test(child, experimenter, paired = T)
+p <- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
+d <- cohensD(child, experimenter, method = 'pooled')
+
+reportobject <- compareValues2(reportedValue = "19", obtainedValue = t_out$parameter[['df']], valueType = 'df') # df
+reportobject <- compareValues2(reportedValue = "3.56", obtainedValue = t_out$statistic, valueType = 't') # t
+reportobject <- compareValues2(reportedValue = "0.81", obtainedValue = d, valueType = 'es') # d
+reportobject <- compareValues2(reportedValue = "0.01", obtainedValue = p, valueType = 'p') # p 
+```
+
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
+
+```{r}
+reportObject <- compareValues2(reportedValue = "0.95", obtainedValue = 0.95, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.38", obtainedValue = 0.38, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "1.52", obtainedValue = 1.52, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.07", obtainedValue = 0.07, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "-0.74", obtainedValue = -0.74, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.59", obtainedValue = 0.59, valueType = 'ci')
+```
+
+> The opposite pattern of responses were observed in the other-focus condition, in which children valued the experimenter’s toy higher (M = 0.86, 95% CI = [0.20, 1.51]), but not their own toy (M = 0.17, 95% CI = [−0.39, 0.73]) - although this effect was not statistically significant (t(19) = −1.61, p = 0.36, d = 0.48, Bonferroni corrected).
+
+```{r}
+child <- forAOV %>% filter(prime_type == 'other', object == 'child') %>% pull(response)
+experimenter <- forAOV %>% filter(prime_type == 'other', object == 'experimenter') %>% pull(response)
+
+# means and cis
+#lsmeans(aov_out, c("prime_type"), by = 'object')
+
+t_out <- t.test(child, experimenter, paired = T)
+p <- p.adjust(p = t_out$p.value, method = 'bonferroni', n = 3)
+d <- cohensD(child, experimenter, method = 'pooled')
+
+reportobject <- compareValues2(reportedValue = "19", obtainedValue = t_out$parameter[['df']], valueType = 'df') # df
+reportobject <- compareValues2(reportedValue = "-1.61", obtainedValue = t_out$statistic, valueType = 't') # t
+reportobject <- compareValues2(reportedValue = ".48", obtainedValue = d, valueType = 'es') # d
+reportobject <- compareValues2(reportedValue = ".36", obtainedValue = p, valueType = 'p') # p 
+```
+
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
+
+```{r}
+reportObject <- compareValues2(reportedValue = "0.86", obtainedValue = 0.86, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.20", obtainedValue = 0.20, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "1.51", obtainedValue = 1.51, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.17", obtainedValue = 0.17, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "-0.39", obtainedValue = -0.39, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "0.73", obtainedValue = 0.73, valueType = 'ci')
+```
+
+> There was no significant effect of toy owner in the neutral-focus condition (Mchild = 0.89, 95% CIchild = [0.31, 1.46], Mexperimenter = 0.71, 95% CIexperimenter = [0.04, 1.38], t(19) = 0.48, p = 0.64, d = 0.13).
+
+```{r}
+child <- forAOV %>% filter(prime_type == 'neutral', object == 'child') %>% pull(response)
+experimenter <- forAOV %>% filter(prime_type == 'neutral', object == 'experimenter') %>% pull(response)
+
+# means and cis
+# lsmeans(aov_out, c("prime_type"), by = 'object')
+
+t_out <- t.test(child, experimenter, paired = T)
+d <- cohensD(child, experimenter, method = 'pooled')
+
+reportobject <- compareValues2(reportedValue = "19", obtainedValue = t_out$parameter[['df']], valueType = 'df') # df
+reportobject <- compareValues2(reportedValue = "0.48", obtainedValue = t_out$statistic, valueType = 't') # t
+reportobject <- compareValues2(reportedValue = ".13", obtainedValue = d, valueType = 'es') # d
+reportobject <- compareValues2(reportedValue = ".64", obtainedValue = t_out$p.value, valueType = 'p') # p 
+```
+For t-test output -  All matches. Note that the marginal means and CIs don't quite match up. But the SPSS syntax provided by the authors does reproduce the values correctly. As such we are not considering these reproducibility errors.
+
+```{r}
+reportObject <- compareValues2(reportedValue = "0.89", obtainedValue = 0.89, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.31", obtainedValue = 0.31, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "1.46", obtainedValue = 1.46, valueType = 'ci')
+
+reportObject <- compareValues2(reportedValue = "0.71", obtainedValue = 0.71, valueType = 'mean')
+reportObject <- compareValues2(reportedValue = "0.04", obtainedValue = 0.04, valueType = 'ci')
+reportObject <- compareValues2(reportedValue = "1.38", obtainedValue = 1.38, valueType = 'ci')
+```
+
+## Step 5: Conclusion
+
+We initially ran into difficulties with this reproducibility check. Specifically, we were able to reproduce the output of the ANCOVA and t-tests failrly closely, but many of the means and CIs were not matching up. The original authors informed us that these values were in fact marginal means rather than sample means - this was not reported in the paper. We attempted to calculate the marginal means with the R function lsmeans, and came much closer, but still could not reporduce some values. However, the authors have provided SPSS syntax which can be used to reproduce the values reported in the article.
+
+Provision of the SPSS syntax and corresponding data file also enabled us to solve a secondary issue. We noticed that our normalized age values did not match up exactly with those in the SPSS file. Eventually, we identified the source of the problem - in the original data file, the age for participant 103 is given as “4y8m" i.e, 56 months. However, in the SPSS data file the age for this participant is given as 57 months. When we changed the age to 57, the normalised values matched up. 
+
+```{r}
+reportObject$Article_ID <- "JcuWB"
+reportObject$affectsConclusion <- "no"
+reportObject$error_typo <- 0
+reportObject$error_specification <- 0
+reportObject$error_analysis <- 0
+reportObject$error_data <- 0
+reportObject$error_unidentified <- 0
+reportObject$Author_Assistance <- T
+reportObject$resolved_typo <- 0
+reportObject$resolved_specification <- 1
+reportObject$resolved_analysis <- 0
+reportObject$resolved_data <- 1
+reportObject$correctionSuggested <- NA
+reportObject$correctionPublished <- NA
+
+# decide on final outcome
+if(reportObject$Decision_Errors > 0 | reportObject$Major_Numerical_Errors > 0 | reportObject$Insufficient_Information_Errors > 0){
+  reportObject$finalOutcome <- "Failure"
+  if(reportObject$Author_Assistance == T){
+    reportObject$finalOutcome <- "Failure despite author assistance"
+  }
+}else{
+  reportObject$finalOutcome <- "Success"
+  if(reportObject$Author_Assistance == T){
+    reportObject$finalOutcome <- "Success with author assistance"
+  }
+}
+
+# save the report object
+filename <- paste0("reportObject_", reportObject$Article_ID,".csv")
+write_csv(reportObject, filename)
+```
+
+## Report Object
+
+```{r, echo = FALSE}
+# display report object in chunks
+kable(reportObject[2:10], align = 'l')
+kable(reportObject[11:20], align = 'l')
+kable(reportObject[21:25], align = 'l')
+kable(reportObject[26:30], align = 'l')
+kable(reportObject[31:35], align = 'l')
+kable(reportObject[36:40], align = 'l')
+kable(reportObject[41:45], align = 'l')
+kable(reportObject[46:51], align = 'l')
+kable(reportObject[52:57], align = 'l')
+```
+
+## Session information
+
+```{r session_info, include=TRUE, echo=TRUE, results='markup'}
+devtools::session_info()
+```
